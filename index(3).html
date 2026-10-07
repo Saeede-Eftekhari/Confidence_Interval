@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confidence Interval Lab · MGSC 3005</title>
+<meta name="description" content="MGSC 3005 Week 8: build a confidence interval for the mean GMAT score from one sample, then simulate many samples to see what 95% confidence really means.">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface-2: #f0efea;
+    --text: #0b0b0b;
+    --text-2: #52514e;
+    --muted: #7a7872;
+    --border: #e2e0d9;
+    --accent: #2a78d6;
+    --accent-ink: #ffffff;
+    --accent-soft: #e6f0fb;
+    --pop: #a3a098;
+    --means: #2a78d6;
+    --curve: #eb6834;
+    --good: #0d7a3c;
+    --good-soft: #e5f4ea;
+    --warn: #9a5b00;
+    --warn-soft: #fdf1dc;
+    --bad: #c4314b;
+    --bad-soft: #fbe9ec;
+    --grid: #ebe9e3;
+    --teal: #0f7f68;
+    --teal-soft: #e2f3ee;
+    --violet: #4a3aa7;
+    --violet-soft: #eeecfa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --text: #ffffff; --text-2: #c3c2b7;
+      --muted: #9a998f; --border: #34332f; --accent: #3987e5; --accent-ink: #ffffff; --accent-soft: #1c2a3b;
+      --pop: #6f6d66; --means: #3987e5; --curve: #d95926; --good: #4cc27a; --good-soft: #16291d;
+      --warn: #e0a64a; --warn-soft: #2e2415; --bad: #ef6b81; --bad-soft: #351a20; --grid: #2a2a27;
+      --teal: #3cc79e; --teal-soft: #14302a; --violet: #a99ff0; --violet-soft: #231f3a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --text: #ffffff; --text-2: #c3c2b7;
+    --muted: #9a998f; --border: #34332f; --accent: #3987e5; --accent-ink: #ffffff; --accent-soft: #1c2a3b;
+    --pop: #6f6d66; --means: #3987e5; --curve: #d95926; --good: #4cc27a; --good-soft: #16291d;
+    --warn: #e0a64a; --warn-soft: #2e2415; --bad: #ef6b81; --bad-soft: #351a20; --grid: #2a2a27;
+    --teal: #3cc79e; --teal-soft: #14302a; --violet: #a99ff0; --violet-soft: #231f3a;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px; line-height: 1.55;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
+  header .kicker { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--teal); font-weight: 700; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 6px 0 10px; letter-spacing: -.01em; }
+  .lede { color: var(--text-2); margin: 0 0 18px; max-width: 70ch; }
+  .context { background: var(--violet-soft); border: 1px solid var(--border); border-left: 5px solid var(--violet); border-radius: 12px; padding: 14px 16px; font-size: 15px; color: var(--text-2); }
+  .context b { color: var(--text); }
+
+  .progress { display: flex; gap: 6px; margin: 22px 0 8px; flex-wrap: wrap; }
+  .progress span { flex: 1 1 0; min-width: 28px; height: 6px; border-radius: 3px; background: var(--border); transition: background .3s; }
+  .progress span.done { background: var(--accent); }
+
+  section.step {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 20px 22px; margin-top: 18px; transition: opacity .3s;
+  }
+  section.step.locked { opacity: .45; pointer-events: none; user-select: none; }
+  .step-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .step-num {
+    flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+    display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; transform: translateY(4px);
+  }
+  section.locked .step-num { background: var(--muted); }
+  h2 { font-size: 21px; margin: 0; line-height: 1.3; }
+  h3 { font-size: 16.5px; margin: 18px 0 4px; }
+  .step p { margin: 8px 0; }
+  .hint { color: var(--text-2); font-size: 15px; }
+  .lock-note { display: none; font-size: 14px; color: var(--muted); margin-top: 4px; }
+  section.locked .lock-note { display: block; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 14px 0; }
+  .stat { background: var(--teal-soft); border-top: 3px solid var(--teal); border-radius: 10px; padding: 10px 12px; }
+  .stat .lbl { font-size: 13px; color: var(--teal); font-weight: 600; }
+  .stat .val { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .sub { font-size: 12.5px; color: var(--muted); }
+  .stat.unknown { background: var(--surface-2); border-top-color: var(--muted); }
+  .stat.unknown .lbl { color: var(--muted); }
+  .stat.unknown .val { color: var(--muted); }
+
+  button {
+    font: inherit; font-size: 15px; font-weight: 600; border-radius: 9px; padding: 9px 16px; cursor: pointer;
+    border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); transition: filter .15s, transform .05s;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:active { transform: translateY(1px); }
+  button.secondary { background: transparent; color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 12px 0 4px; }
+
+  .choices { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+  .choices button { min-width: 78px; background: transparent; color: var(--accent); }
+  .choices button.active { background: var(--accent); color: var(--accent-ink); }
+  .choice-label { font-size: 14px; color: var(--text-2); font-weight: 600; margin-top: 10px; }
+
+  .chart { width: 100%; margin: 8px 0 2px; }
+  .chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .chart-title { font-size: 14.5px; font-weight: 600; margin-top: 14px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13.5px; color: var(--text-2); margin: 4px 0; }
+  .legend i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  .legend i.line { height: 3px; border-radius: 2px; vertical-align: 2px; }
+  .legend i.dash { height: 0; border-top: 2px dashed var(--text-2); background: none; vertical-align: 3px; }
+  .axis text { font-size: 11px; fill: var(--muted); font-family: inherit; }
+  .axis-title { font-size: 11.5px; fill: var(--text-2); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; max-height: 170px; overflow: auto; padding: 2px; }
+  .chip { background: var(--surface-2); border-radius: 6px; padding: 3px 8px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+
+  .xbar { text-decoration: overline; font-style: italic; }
+  .sym { font-style: italic; }
+  .formula { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-size: 14px; background: var(--teal-soft); color: var(--teal); font-weight: 600; padding: 1px 6px; border-radius: 5px; white-space: nowrap; }
+
+  .big-formula {
+    background: var(--teal-soft); border-radius: 12px; padding: 14px 16px; margin: 12px 0; text-align: center;
+    font-size: 22px; font-family: "Cambria Math", "STIX Two Math", Cambria, Georgia, serif;
+  }
+  .big-formula .tag { display: block; font-family: inherit; font-size: 13px; color: var(--teal); font-weight: 700; letter-spacing: .02em; margin-bottom: 6px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+  .frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; margin: 0 2px; font-size: .9em; }
+  .frac > span:first-child { border-bottom: 1.5px solid currentColor; padding: 0 4px; }
+  .frac > span:last-child { padding: 0 4px; }
+  .sqrt { white-space: nowrap; }
+  .sqrt > span { border-top: 1.5px solid currentColor; padding: 0 2px; }
+  .skeleton { text-align: center; font-weight: 700; font-size: 17px; margin: 10px 0; color: var(--violet); }
+
+  .table-wrap { overflow-x: auto; margin: 10px 0; border: 1px solid var(--border); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--border); }
+  th { background: var(--surface-2); font-weight: 600; color: var(--text-2); font-size: 13.5px; }
+  th:first-child, td:first-child { text-align: left; }
+  td.l, th.l { text-align: left; }
+  tr:last-child td { border-bottom: none; }
+  .tag-unknown { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px; background: var(--warn-soft); color: var(--warn); }
+  .tag-known { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px; background: var(--good-soft); color: var(--good); }
+  .tag-choose { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+
+  .predict { background: var(--violet-soft); border-left: 5px solid var(--violet); border-radius: 10px; padding: 12px 14px; margin: 12px 0; }
+  .predict > b:first-child { color: var(--violet); }
+  .predict label { display: block; margin: 4px 0; cursor: pointer; font-size: 15px; }
+  .feedback { border-radius: 10px; padding: 10px 14px; margin: 10px 0; font-size: 15px; display: none; }
+  .feedback.show { display: block; }
+  .feedback.good { background: var(--good-soft); color: var(--text); border-left: 4px solid var(--good); }
+  .feedback.warn { background: var(--warn-soft); color: var(--text); border-left: 4px solid var(--warn); }
+  .feedback.info { background: var(--accent-soft); color: var(--text); border-left: 4px solid var(--accent); }
+
+  .excel-check { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 10px 0; }
+  .excel-check label { font-size: 14px; color: var(--text-2); display: block; margin-bottom: 4px; }
+  .excel-check input { width: 100%; font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+
+  .notation { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 10px 0; font-size: 15px; }
+  .notation .s { font-family: "Cambria Math", Cambria, Georgia, serif; font-size: 18px; text-align: center; min-width: 54px; background: var(--surface-2); border-radius: 6px; padding: 0 6px; }
+
+  .callout { border: 2px solid var(--accent); border-radius: 12px; padding: 14px 16px; margin: 12px 0; background: var(--accent-soft); }
+  .callout.warnbox { border-color: var(--warn); background: var(--warn-soft); }
+  .anchor { font-size: 19px; font-weight: 700; text-align: center; margin: 16px 0 6px; color: var(--violet); }
+  .frame { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; font-size: 15.5px; margin: 10px 0; }
+  .frame b { font-variant-numeric: tabular-nums; }
+
+  .counter { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 12px 0; }
+  .counter .stat.hit { background: var(--good-soft); border-top-color: var(--good); }
+  .counter .stat.hit .lbl { color: var(--good); }
+  .counter .stat.miss { background: var(--bad-soft); border-top-color: var(--bad); }
+  .counter .stat.miss .lbl { color: var(--bad); }
+  .sim-controls { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end; margin: 8px 0; }
+  .sim-controls label { font-size: 13.5px; color: var(--text-2); font-weight: 600; display: block; margin-bottom: 4px; }
+  select { font: inherit; font-size: 15px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+
+  details { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+  summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+  .qa { margin: 12px 0; }
+  .qa .q { font-weight: 600; }
+  .qa .a { display: none; margin-top: 6px; padding: 10px 14px; border-radius: 10px; background: var(--good-soft); border-left: 4px solid var(--good); }
+  .qa.open .a { display: block; }
+  .qa button { margin-top: 6px; padding: 5px 12px; font-size: 14px; }
+  footer { margin-top: 28px; font-size: 13px; color: var(--muted); }
+  ol.excel-steps { padding-left: 22px; margin: 8px 0; }
+  ol.excel-steps li { margin: 4px 0; }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 25px; }
+    section.step { padding: 16px 14px 18px; }
+    .stat .val { font-size: 19px; }
+    .big-formula { font-size: 18px; padding: 12px 8px; }
+    th, td { padding: 6px 8px; }
+    .formula { white-space: normal; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">MGSC 3005 · Week 8 · Session 2</div>
+  <h1>Estimating an Unknown Mean: Building and Understanding a Confidence Interval</h1>
+  <p class="lede">You will act as the analyst. You do <b>not</b> know the population. You get <b>one sample</b>, and from it you build a confidence interval for the population mean. Then a simulation shows what "95% confident" really means. Work through the steps in order. Each step unlocks the next one.</p>
+  <div class="context">
+    <b>Business context (Doane Example 8.3).</b> The MBA admissions office at a medium-sized public university wants to know the
+    <b>average GMAT score of its whole applicant pool</b>. Checking every applicant's file is costly, so an analyst draws a
+    <b>random sample</b> of applicants and uses it to <b>estimate</b> the true mean score <span class="sym">μ</span>.
+    The true value of <span class="sym">μ</span> stays hidden until Step 6.
+  </div>
+</header>
+
+<div class="progress" aria-hidden="true" id="progress">
+  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+</div>
+
+<!-- STEP 1 -->
+<section class="step" id="step1">
+  <div class="step-head"><span class="step-num">1</span><h2>What we know and what we don't</h2></div>
+  <p>In real business work, the population is <b>unknown</b>. We cannot see every applicant's score, so we cannot compute <span class="sym">μ</span> directly. All we will have is <b>one sample</b>.</p>
+  <div class="stats">
+    <div class="stat unknown"><div class="lbl">Population mean</div><div class="val"><span class="sym">μ</span> = ?</div><div class="sub">parameter: what we want to estimate</div></div>
+    <div class="stat unknown"><div class="lbl">Population std. dev.</div><div class="val"><span class="sym">σ</span> = ?</div><div class="sub">parameter: usually unknown too</div></div>
+    <div class="stat unknown"><div class="lbl">Population shape</div><div class="val">?</div><div class="sub">we never see the whole pool</div></div>
+  </div>
+  <h3>Parameters vs. statistics</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Symbol</th><th class="l">Meaning</th><th class="l">Type</th><th class="l">Do we know it?</th></tr></thead>
+      <tbody>
+        <tr><td><span class="sym">μ</span></td><td class="l">Population mean GMAT score</td><td class="l">Parameter (fixed number)</td><td class="l"><span class="tag-unknown">Unknown: the target</span></td></tr>
+        <tr><td><span class="sym">σ</span></td><td class="l">Population standard deviation</td><td class="l">Parameter (fixed number)</td><td class="l"><span class="tag-unknown">Usually unknown</span></td></tr>
+        <tr><td><span class="sym">n</span></td><td class="l">Sample size (number of applicants sampled)</td><td class="l">Design choice</td><td class="l"><span class="tag-choose">You choose it</span></td></tr>
+        <tr><td><span class="xbar">x</span></td><td class="l">Sample mean</td><td class="l">Statistic (changes from sample to sample)</td><td class="l"><span class="tag-known">Computed from the sample</span></td></tr>
+        <tr><td><span class="sym">s</span></td><td class="l">Sample standard deviation</td><td class="l">Statistic (changes from sample to sample)</td><td class="l"><span class="tag-known">Computed from the sample</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="hint"><b>The plan:</b> use the statistic <span class="xbar">x</span> as our best single guess (the <b>point estimate</b>) for the parameter <span class="sym">μ</span>. Then add a <b>margin of error</b> so we report a range instead of one number.</p>
+  <div class="btn-row"><button id="btnStep1">Got it. Next step</button></div>
+</section>
+
+<!-- STEP 2 -->
+<section class="step locked" id="step2">
+  <div class="step-head"><span class="step-num">2</span><h2>Draw your one sample</h2></div>
+  <div class="lock-note">Finish Step 1 to unlock.</div>
+  <p>Choose the sample size. Doane Example 8.3 uses <b>n = 20</b>, so start there.</p>
+  <div class="choices" id="nChoices">
+    <button data-n="10">n = 10</button>
+    <button data-n="20" class="active">n = 20</button>
+    <button data-n="50">n = 50</button>
+  </div>
+  <div class="btn-row"><button id="btnDraw">Draw my random sample of <span class="nText">20</span> applicants</button></div>
+  <div id="sampleOut" style="display:none">
+    <p>Here are the GMAT scores of your <b class="nText">20</b> randomly selected applicants. This is <b>all the data you have</b>.</p>
+    <div class="chips" id="sampleChips"></div>
+    <div class="btn-row">
+      <button class="secondary" id="btnCopySample">Copy my sample for Excel</button>
+      <span class="hint" id="copySampleMsg"></span>
+    </div>
+    <p><b>In Excel:</b> paste into column A starting in cell A1 (one score per cell). Then compute:</p>
+    <ul>
+      <li>the sample mean <span class="xbar">x</span> with <span class="formula">=AVERAGE(A1:A<span class="nText">20</span>)</span></li>
+      <li>the sample standard deviation <span class="sym">s</span> with <span class="formula">=STDEV.S(A1:A<span class="nText">20</span>)</span> (not STDEV.P)</li>
+    </ul>
+    <div class="excel-check">
+      <div><label for="inXbar">Your Excel result: x̄ = AVERAGE</label><input id="inXbar" inputmode="decimal" placeholder="e.g., 512.35"></div>
+      <div><label for="inS">Your Excel result: s = STDEV.S</label><input id="inS" inputmode="decimal" placeholder="e.g., 80.12"></div>
+    </div>
+    <div class="btn-row">
+      <button id="btnCheck2">Check my answers</button>
+      <button class="secondary" id="btnReveal2">Show the answers</button>
+    </div>
+    <div class="feedback" id="fb2"></div>
+    <div id="out2" style="display:none">
+      <div class="stats">
+        <div class="stat"><div class="lbl">Sample size</div><div class="val"><span class="sym">n</span> = <span class="nText">20</span></div><div class="sub">you chose it</div></div>
+        <div class="stat"><div class="lbl">Sample mean</div><div class="val"><span class="xbar">x</span> = <span id="vXbar"></span></div><div class="sub">point estimate of μ</div></div>
+        <div class="stat"><div class="lbl">Sample std. dev.</div><div class="val"><span class="sym">s</span> = <span id="vS"></span></div><div class="sub">our estimate of σ</div></div>
+      </div>
+      <p class="hint">Is the true mean <span class="sym">μ</span> exactly <b id="vXbar2"></b>? Almost certainly not. A different random sample would give a different <span class="xbar">x</span>. That is why we need a range.</p>
+      <div class="btn-row"><button id="btnStep2">Next: the formula</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- STEP 3 -->
+<section class="step locked" id="step3">
+  <div class="step-head"><span class="step-num">3</span><h2>The formula when σ is known</h2></div>
+  <div class="lock-note">Finish Step 2 to unlock.</div>
+  <p>When the <b>population standard deviation <span class="sym">σ</span> is known</b>, we can build a confidence interval for the unknown mean <span class="sym">μ</span> using the normal distribution.</p>
+  <div class="callout">
+    <b>In this lab, σ is known.</b> From many years of past applicant data, the admissions office knows that GMAT scores in its pool have a population standard deviation of
+    <b><span class="sym">σ</span> = <span class="sigText">86.80</span></b>. The population mean <span class="sym">μ</span> is still <b>unknown</b>; that is what we estimate.
+    (You computed <span class="sym">s</span> in Step 2, but because <span class="sym">σ</span> is known, the formula uses <span class="sym">σ</span>.)
+  </div>
+  <p>Every confidence interval in Chapter 8 has the same skeleton:</p>
+  <div class="skeleton">point estimate ± critical value × standard error</div>
+  <p class="hint">Margin of error (ME) = critical value × standard error. The interval is point estimate ± ME.</p>
+
+  <h3>Confidence interval for μ with known σ (slide 20, Eq. 8.6)</h3>
+  <div class="big-formula">
+    <span class="tag">CI for μ, σ known</span>
+    <i>x̄</i> ± <i>z</i><sub><i>α</i>/2</sub> <span class="frac"><span><i>σ</i></span><span><span class="sqrt">√<span><i>n</i></span></span></span></span>
+  </div>
+  <div class="notation">
+    <div class="s"><i>x̄</i></div><div>Sample mean, calculated from a random sample <i>x</i><sub>1</sub>, <i>x</i><sub>2</sub>, …, <i>x<sub>n</sub></i>. This is the <b>point estimate</b> (from your Step 2 sample).</div>
+    <div class="s"><i>σ</i></div><div>Population standard deviation, <b>assumed known</b>. Here <i>σ</i> = <span class="sigText">86.80</span>.</div>
+    <div class="s"><i>n</i></div><div>Sample size. Here <i>n</i> = <span class="nText">20</span>.</div>
+    <div class="s"><i>σ</i>/√<i>n</i></div><div><b>Standard error</b> of <i>x̄</i>: how much sample means typically vary from sample to sample.</div>
+    <div class="s">1 − <i>α</i></div><div><b>Confidence level</b>: the middle area under the curve (for example, 0.95).</div>
+    <div class="s"><i>α</i></div><div>The leftover area, split into <b>two symmetric tails</b>, each with area <i>α</i>/2.</div>
+    <div class="s"><i>z</i><sub><i>α</i>/2</sub></div><div><b>Critical z-value</b>: the cutoff that leaves area <i>α</i>/2 in each tail. Determined by the desired confidence level.</div>
+  </div>
+
+  <p class="choice-label">Choose a confidence level and watch the picture change:</p>
+  <div class="choices" id="levelChoices">
+    <button data-l="0.90">90%</button>
+    <button data-l="0.95" class="active">95%</button>
+    <button data-l="0.99">99%</button>
+  </div>
+  <div class="chart-title" id="zTitle"></div>
+  <div class="legend">
+    <span><i style="background:var(--teal-soft); border:1px solid var(--teal)"></i>Middle area = confidence level 1 − α</span>
+    <span><i style="background:var(--curve)"></i>Two tails, each α/2</span>
+  </div>
+  <div class="chart" id="zChart"></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Confidence level 1 − α</th><th>α</th><th>α/2 (each tail)</th><th>z<sub>α/2</sub></th><th>Excel</th></tr></thead>
+      <tbody id="zTable"></tbody>
+    </table>
+  </div>
+  <p class="hint">A higher confidence level gives a larger <i>z</i><sub><i>α</i>/2</sub> and a <b>wider</b> interval. Greater confidence costs precision.</p>
+  <h3>Your interval, piece by piece</h3>
+  <p class="hint" id="pieceNote"></p>
+  <div class="btn-row"><button id="btnStep3">Next: compute my interval</button></div>
+</section>
+
+<!-- STEP 4 -->
+<section class="step locked" id="step4">
+  <div class="step-head"><span class="step-num">4</span><h2>Build your <span class="lvlText">95%</span> confidence interval in Excel</h2></div>
+  <div class="lock-note">Finish Step 3 to unlock.</div>
+  <p>Use your sample mean from Step 2, the known <i>σ</i> = <span class="sigText">86.80</span>, and the six-step workflow from class. Keep your Excel sheet open next to this page.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="l">Step</th><th class="l">Quantity</th><th class="l">Excel formula</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="l">Inputs: <i>x̄</i>, <i>σ</i>, <i>n</i>, confidence level</td><td class="l"><span class="formula">=AVERAGE(A1:A<span class="nText">20</span>)</span>, <span class="sigText">86.80</span>, <span class="nText">20</span>, <span class="lvlDec">0.95</span></td></tr>
+        <tr><td>2</td><td class="l">α and critical value <i>z</i><sub>α/2</sub></td><td class="l">α = <span class="formula">=1−<span class="lvlDec">0.95</span></span>, then <span class="formula">=NORM.S.INV(1−α/2)</span></td></tr>
+        <tr><td>3</td><td class="l">Standard error <i>σ</i> / √<i>n</i></td><td class="l"><span class="formula">=<span class="sigText">86.80</span>/SQRT(<span class="nText">20</span>)</span></td></tr>
+        <tr><td>4</td><td class="l">Margin of error</td><td class="l"><span class="formula">=z × SE</span> (shortcut: <span class="formula">=CONFIDENCE.NORM(α, <span class="sigText">86.80</span>, <span class="nText">20</span>)</span>)</td></tr>
+        <tr><td>5</td><td class="l">Lower and upper bounds</td><td class="l"><span class="formula">=x̄ − ME</span> and <span class="formula">=x̄ + ME</span></td></tr>
+        <tr><td>6</td><td class="l">Interpretation</td><td class="l">Step 5 on this page</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="excel-check">
+    <div><label for="inT">Critical value z</label><input id="inT" inputmode="decimal" placeholder="e.g., 1.960"></div>
+    <div><label for="inSE">Standard error</label><input id="inSE" inputmode="decimal"></div>
+    <div><label for="inME">Margin of error</label><input id="inME" inputmode="decimal"></div>
+    <div><label for="inLo">Lower bound</label><input id="inLo" inputmode="decimal"></div>
+    <div><label for="inHi">Upper bound</label><input id="inHi" inputmode="decimal"></div>
+  </div>
+  <div class="btn-row">
+    <button id="btnCheck4">Check my answers</button>
+    <button class="secondary" id="btnReveal4">Show the answers</button>
+  </div>
+  <div class="feedback" id="fb4"></div>
+  <div id="out4" style="display:none">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th class="l">Quantity</th><th>Value</th></tr></thead>
+        <tbody id="ciTable"></tbody>
+      </table>
+    </div>
+    <div class="chart-title">Your interval on the GMAT scale</div>
+    <div class="legend"><span><i class="line" style="background:var(--accent)"></i>Your <span class="lvlText">95%</span> CI</span><span><i style="background:var(--accent); border-radius:50%; width:10px; height:10px"></i>Point estimate <i>x̄</i></span></div>
+    <div class="chart" id="myCIChart"></div>
+    <div class="btn-row"><button id="btnStep4">Next: interpret it</button></div>
+  </div>
+</section>
+
+<!-- STEP 5 -->
+<section class="step locked" id="step5">
+  <div class="step-head"><span class="step-num">5</span><h2>Interpret your interval</h2></div>
+  <div class="lock-note">Finish Step 4 to unlock.</div>
+  <p>Use the reusable sentence frame from class. Here it is with your numbers filled in:</p>
+  <div class="frame" id="frameText"></div>
+  <div class="predict">
+    <b>Which statement about your interval is correct?</b>
+    <label><input type="radio" name="interp" value="a"> <span id="optA"></span></label>
+    <label><input type="radio" name="interp" value="b"> <span id="optB"></span></label>
+    <label><input type="radio" name="interp" value="c"> <span id="optC"></span></label>
+    <label><input type="radio" name="interp" value="d"> <span id="optD"></span></label>
+  </div>
+  <div class="btn-row"><button id="btnCheck5">Check</button></div>
+  <div class="feedback" id="fb5"></div>
+  <div class="btn-row" id="row5" style="display:none"><button id="btnStep5">Next: lift the curtain</button></div>
+</section>
+
+<!-- STEP 6 -->
+<section class="step locked" id="step6">
+  <div class="step-head"><span class="step-num">6</span><h2>Lift the curtain: did your interval catch μ?</h2></div>
+  <div class="lock-note">Finish Step 5 to unlock.</div>
+  <div class="callout warnbox"><b>This never happens in real life.</b> An analyst never gets to see the true <span class="sym">μ</span>. We reveal it here only so you can check how the method performs.</div>
+  <div class="btn-row"><button id="btnRevealMu">Reveal the true population mean μ</button></div>
+  <div id="out6" style="display:none">
+    <div class="stats">
+      <div class="stat"><div class="lbl">Population size</div><div class="val">N = 2,637</div></div>
+      <div class="stat"><div class="lbl">True population mean</div><div class="val"><span class="sym">μ</span> = <span id="muVal"></span></div><div class="sub">fixed; it was there all along</div></div>
+      <div class="stat"><div class="lbl">Population std. dev.</div><div class="val"><span class="sym">σ</span> = <span id="sigmaVal"></span></div><div class="sub">known; used in your interval</div></div>
+    </div>
+    <div class="chart-title">The whole applicant pool, with your interval underneath</div>
+    <div class="legend"><span><i style="background:var(--pop)"></i>All 2,637 GMAT scores</span><span><i class="dash"></i>True <span class="sym">μ</span></span><span><i class="line" style="background:var(--accent)"></i>Your CI</span></div>
+    <div class="chart" id="popChart"></div>
+    <div class="feedback" id="fb6"></div>
+    <p class="hint">Notice that the interval is much narrower than the spread of individual scores. A CI is about the <b>mean</b> score, not about individual applicants.</p>
+    <p>Your one interval either contains <span class="sym">μ</span> or it does not. So where does the "<span class="lvlText">95%</span>" come from? Step 7 answers that.</p>
+    <div class="btn-row"><button id="btnStep6">Next: simulate many samples</button></div>
+  </div>
+</section>
+
+<!-- STEP 7 -->
+<section class="step locked" id="step7">
+  <div class="step-head"><span class="step-num">7</span><h2>What does "95% confident" mean? Repeat the whole process many times</h2></div>
+  <div class="lock-note">Finish Step 6 to unlock.</div>
+  <p>Imagine 100 analysts. Each one draws their own random sample of the same size and builds a confidence interval with the same formula, <i>x̄</i> ± <i>z</i><sub>α/2</sub> <i>σ</i>/√<i>n</i>, exactly as you did. Every interval will be a little different. <b>How many of them will contain the true <span class="sym">μ</span>?</b></p>
+  <div class="predict" id="predict7">
+    <b>Predict first.</b> Out of 100 intervals at the <span class="lvlText">95%</span> level, about how many will contain <span class="sym">μ</span>?
+    <label><input type="radio" name="pred7" value="all"> All 100</label>
+    <label><input type="radio" name="pred7" value="most"> About <span class="lvlPct">95</span></label>
+    <label><input type="radio" name="pred7" value="half"> About 50</label>
+    <label><input type="radio" name="pred7" value="none"> It is impossible to say</label>
+  </div>
+  <div class="sim-controls">
+    <div><label for="simLevel">Confidence level</label>
+      <select id="simLevel"><option value="0.90">90%</option><option value="0.95" selected>95%</option><option value="0.99">99%</option></select></div>
+    <div><label for="simN">Sample size n</label>
+      <select id="simN"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select></div>
+  </div>
+  <div class="btn-row">
+    <button id="btnSim1">Draw 1 sample</button>
+    <button id="btnSim100">Draw 100 samples</button>
+    <button class="secondary" id="btnPause" disabled>Pause</button>
+    <button class="secondary" id="btnSimReset">Reset</button>
+  </div>
+  <div class="counter">
+    <div class="stat"><div class="lbl">Intervals built</div><div class="val" id="cTotal">0</div></div>
+    <div class="stat hit"><div class="lbl">Contain μ</div><div class="val" id="cHit">0</div></div>
+    <div class="stat miss"><div class="lbl">Miss μ</div><div class="val" id="cMiss">0</div></div>
+    <div class="stat"><div class="lbl">Percent containing μ</div><div class="val" id="cPct">–</div><div class="sub" id="cTarget">target: 95%</div></div>
+  </div>
+  <div class="feedback" id="fb7"></div>
+  <div class="chart-title">Each horizontal line is one sample's confidence interval (newest at the top)</div>
+  <div class="legend">
+    <span><i class="line" style="background:var(--good)"></i>Contains μ</span>
+    <span><i class="line" style="background:var(--bad)"></i>Misses μ</span>
+    <span><i style="background:var(--text-2); border-radius:50%; width:8px; height:8px"></i><i>x̄</i> of that sample</span>
+    <span><i class="dash"></i>True <span class="sym">μ</span> (fixed)</span>
+  </div>
+  <div class="chart" id="simChart"></div>
+  <p class="hint" id="simAxisNote"></p>
+  <div class="chart-title">Running percentage of intervals that contain μ</div>
+  <div class="chart" id="runChart"></div>
+
+  <h3>Check the count yourself in Excel</h3>
+  <ol class="excel-steps">
+    <li>Click <b>Copy all intervals for Excel</b>. Paste into a new sheet at cell A1. You get columns: Sample, x̄, Lower, Upper.</li>
+    <li>In E1 type <b>Contains μ?</b> In E2 type <span class="formula">=AND(C2&lt;=<span class="muText">520.78</span>, D2&gt;=<span class="muText">520.78</span>)</span> and fill down.</li>
+    <li>Count the hits: <span class="formula">=COUNTIF(E:E, TRUE)</span>. Percentage: <span class="formula">=COUNTIF(E:E,TRUE)/COUNT(A:A)</span></li>
+  </ol>
+  <div class="btn-row">
+    <button class="secondary" id="btnCopySim">Copy all intervals for Excel</button>
+    <span class="hint" id="copySimMsg"></span>
+  </div>
+  <div class="excel-check">
+    <div><label for="inHits">Your Excel result: number of intervals that contain μ</label><input id="inHits" inputmode="numeric"></div>
+  </div>
+  <div class="btn-row"><button id="btnCheck7">Check my count</button></div>
+  <div class="feedback" id="fb7b"></div>
+  <details>
+    <summary>Try these experiments</summary>
+    <ul>
+      <li>Switch to <b>99%</b> and draw 100 more. The intervals get <b>wider</b> and fewer of them miss.</li>
+      <li>Switch to <b>90%</b>. The intervals get <b>narrower</b>, and about 1 in 10 misses.</li>
+      <li>Switch to <b>n = 50</b>. The intervals get <b>narrower</b>, but the hit rate stays near the confidence level. Larger samples buy precision, not a different success rate.</li>
+      <li>Look closely: at a given level and <i>n</i>, <b>every interval has the same width</b>, 2 × <i>z</i><sub>α/2</sub> × <i>σ</i>/√<i>n</i>. Only the center <i>x̄</i> moves from sample to sample.</li>
+    </ul>
+  </details>
+  <div class="btn-row"><button id="btnStep7" disabled>Next: what did you discover?</button><span class="hint" id="step7Hint">Build at least 100 intervals to continue.</span></div>
+</section>
+
+<!-- STEP 8 -->
+<section class="step locked" id="step8">
+  <div class="step-head"><span class="step-num">8</span><h2>What did you discover?</h2></div>
+  <div class="lock-note">Build at least 100 intervals in Step 7 to unlock.</div>
+  <p>Answer each question on your own first, then check.</p>
+
+  <div class="qa"><div class="q">1. In the simulation, what moved from sample to sample: <i>μ</i> or the intervals?</div>
+    <button class="secondary">Check</button>
+    <div class="a">The intervals. <i>μ</i> is a fixed number (the dashed line never moved). Each new sample gives a new <i>x̄</i>, so the interval slides around.</div></div>
+
+  <div class="qa"><div class="q">2. What does "95% confidence" describe?</div>
+    <button class="secondary">Check</button>
+    <div class="a">The long-run reliability of the <b>procedure</b>. If we drew many samples this way and built one interval from each, about 95% of those intervals would contain <i>μ</i>. Your simulation showed this.</div></div>
+
+  <div class="qa"><div class="q">3. Is there a 95% probability that μ is inside your one interval from Step 4?</div>
+    <button class="secondary">Check</button>
+    <div class="a">No. Once your sample is drawn, your interval is fixed and <i>μ</i> is fixed. The interval either contains <i>μ</i> or it does not (probability 1 or 0). We just do not know which, so we say we are "95% <b>confident</b>."</div></div>
+
+  <div class="qa"><div class="q">4. What happened when you raised the confidence level from 95% to 99%?</div>
+    <button class="secondary">Check</button>
+    <div class="a">The critical value grew (for example, <i>z</i> from 1.960 to 2.576), so the intervals got wider and fewer missed <i>μ</i>. More confidence costs precision.</div></div>
+
+  <div class="qa"><div class="q">5. What happened when you increased n from 20 to 50?</div>
+    <button class="secondary">Check</button>
+    <div class="a">The intervals got narrower, because the standard error <i>σ</i>/√<i>n</i> shrinks as <i>n</i> grows. The percentage that contain <i>μ</i> stayed near the confidence level. A bigger sample gives a more precise estimate at the same confidence.</div></div>
+
+  <div class="qa"><div class="q">6. In the simulation, why did all the intervals at the same level and n have the same width?</div>
+    <button class="secondary">Check</button>
+    <div class="a">Because the margin of error is <i>z</i><sub>α/2</sub> × <i>σ</i>/√<i>n</i>, and <i>z</i><sub>α/2</sub>, <i>σ</i> and <i>n</i> are the same for every analyst. Only <i>x̄</i> changes from sample to sample, so each interval is the same-length ruler slid to a different center.</div></div>
+
+  <div class="callout">
+    <b>Confidence interval for μ (σ known).</b> <i>x̄</i> ± <i>z</i><sub>α/2</sub> · <i>σ</i>/√<i>n</i>.
+    The sample gives the point estimate <i>x̄</i>; the margin of error reflects sampling uncertainty.
+    <p style="margin-bottom:0"><b>Sentence frame:</b> "We are [level]% confident that the true mean GMAT score μ is between [lower] and [upper]. If we drew many samples this way and built one interval from each, about [level]% of those intervals would contain μ."</p>
+  </div>
+  <div class="anchor">"The 95% describes the method, not any one interval."</div>
+  <p class="hint" style="text-align:center">μ never moves. The intervals do.</p>
+</section>
+
+<footer>
+  MGSC 3005 · Week 8 · Doane and Seward, Chapter 8 (§8.4 and §8.5). The applicant pool on this page is the same simulated set of 2,637 scores used on the
+  <a href="https://saeede-eftekhari.github.io/Sampling/" style="color:var(--accent)">Sampling Distribution page</a>, built to match the lab's population parameters
+  (<span class="sym">μ</span> = 520.78, <span class="sym">σ</span> = 86.80). Every sample is drawn at random, so your numbers will differ from your classmates'.
+</footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- Population (identical to the Sampling page) ----------
+  // To use the real 2,637 GMAT scores instead of the simulated pool,
+  // paste them into this array, e.g. const REAL_SCORES = [530, 450, 600, ...];
+  const REAL_SCORES = null;
+  const MU = 520.78, SIGMA = 86.80, NPOP = 2637;
+  const XMIN = 200, XMAX = 800;
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function meanSd(a) {
+    const m = a.reduce((s, x) => s + x, 0) / a.length;
+    const sd = Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / a.length);
+    return [m, sd];
+  }
+  function buildPopulation() {
+    const r = mulberry32(8012026);
+    let v = [];
+    for (let i = 0; i < NPOP; i++) { let g = 0; for (let k = 0; k < 6; k++) g -= Math.log(1 - r()); v.push(g); }
+    for (let it = 0; it < 40; it++) {
+      const [m, sd] = meanSd(v);
+      v = v.map(x => Math.min(XMAX, Math.max(XMIN, MU + SIGMA * (x - m) / sd)));
+    }
+    const [m, sd] = meanSd(v);
+    v = v.map(x => Math.round(MU + SIGMA * (x - m) / sd));
+    let diff = Math.round(MU * NPOP) - v.reduce((s, x) => s + x, 0), i = 0;
+    while (diff !== 0) { const j = (i * 7919) % NPOP; if (v[j] > 300 && v[j] < 700) { v[j] += Math.sign(diff); diff -= Math.sign(diff); } i++; }
+    return v;
+  }
+  const POP = Array.isArray(REAL_SCORES) && REAL_SCORES.length ? REAL_SCORES.slice() : buildPopulation();
+  const [POP_MU, POP_SIGMA] = meanSd(POP);
+
+  // ---------- Math helpers ----------
+  const $ = id => document.getElementById(id);
+  const avg = a => a.reduce((s, x) => s + x, 0) / a.length;
+  const stdevS = a => { const m = avg(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); };
+  const stdevP = a => { const m = avg(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / a.length); };
+  const f2 = x => x.toFixed(2), f3 = x => x.toFixed(3);
+  const pct = l => Math.round(l * 100);
+
+  // Inverse standard normal (Acklam)
+  function normInv(p) {
+    const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239];
+    const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+    const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+    const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+    const pl = 0.02425;
+    let q, r;
+    if (p < pl) { q = Math.sqrt(-2 * Math.log(p)); return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+    if (p > 1 - pl) { q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+    q = p - 0.5; r = q * q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  }
+  // Student's t CDF via the regularized incomplete beta function
+  function lgamma(x) {
+    const g = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+    let y = x, tmp = x + 5.5; tmp -= (x + 0.5) * Math.log(tmp);
+    let ser = 1.000000000190015; for (let j = 0; j < 6; j++) ser += g[j] / ++y;
+    return -tmp + Math.log(2.5066282746310005 * ser / x);
+  }
+  function betacf(a, b, x) {
+    const MAXIT = 300, EPS = 3e-14, FPMIN = 1e-300;
+    let qab = a + b, qap = a + 1, qam = a - 1, c = 1, d = 1 - qab * x / qap;
+    if (Math.abs(d) < FPMIN) d = FPMIN; d = 1 / d; let h = d;
+    for (let m = 1; m <= MAXIT; m++) {
+      const m2 = 2 * m;
+      let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN; c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN; d = 1 / d; h *= d * c;
+      aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN; c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN; d = 1 / d;
+      const del = d * c; h *= del; if (Math.abs(del - 1) < EPS) break;
+    }
+    return h;
+  }
+  function ibeta(x, a, b) {
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    const bt = Math.exp(lgamma(a + b) - lgamma(a) - lgamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+    return x < (a + 1) / (a + b + 2) ? bt * betacf(a, b, x) / a : 1 - bt * betacf(b, a, 1 - x) / b;
+  }
+  function tcdf(t, df) {
+    const x = df / (df + t * t), tail = 0.5 * ibeta(x, df / 2, 0.5);
+    return t >= 0 ? 1 - tail : tail;
+  }
+  function tInv(p, df) { // p > 0.5
+    let lo = 0, hi = 200;
+    for (let i = 0; i < 200; i++) { const mid = (lo + hi) / 2; if (tcdf(mid, df) < p) lo = mid; else hi = mid; }
+    return (lo + hi) / 2;
+  }
+  const zCrit = level => normInv(1 - (1 - level) / 2);
+  const tCrit = (level, df) => tInv(1 - (1 - level) / 2, df);
+
+  function drawSample(n) {
+    const picked = new Set();
+    while (picked.size < n) picked.add(Math.floor(Math.random() * POP.length));
+    return [...picked].map(i => POP[i]);
+  }
+  function makeCI(sample, level, method) {
+    const n = sample.length, xb = avg(sample), s = stdevS(sample);
+    const crit = method === "z" ? zCrit(level) : tCrit(level, n - 1);
+    const se = (method === "z" ? POP_SIGMA : s) / Math.sqrt(n);
+    const me = crit * se;
+    return { n, xbar: xb, s, crit, se, me, lo: xb - me, hi: xb + me, hit: xb - me <= POP_MU && POP_MU <= xb + me };
+  }
+
+  // ---------- SVG helpers ----------
+  const NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) {
+      const v = attrs[k];
+      if ((k === "fill" || k === "stroke") && typeof v === "string" && v.startsWith("var(")) e.style[k] = v;
+      else e.setAttribute(k, v);
+    }
+    if (text != null) e.textContent = text;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function niceMax(v) {
+    if (v <= 0) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(v)));
+    for (const k of [1, 2, 2.5, 5, 10]) if (k * p >= v) return k * p;
+    return 10 * p;
+  }
+  function niceStep(max) {
+    const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw)));
+    for (const k of [1, 2, 2.5, 5, 10]) if (k * p >= raw) return k * p;
+    return 10 * p;
+  }
+  function barPath(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h);
+    if (h <= 0) return "";
+    return `M${x},${y + h} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + w - r},${y} Q${x + w},${y} ${x + w},${y + r} L${x + w},${y + h} Z`;
+  }
+  const normPdf = (x, m, s) => Math.exp(-0.5 * ((x - m) / s) ** 2) / (s * Math.sqrt(2 * Math.PI));
+
+  // ---------- State ----------
+  let n = 20, sample = null, level = 0.95, myCI = null, stepDone = new Set();
+
+  function unlock(k) { $("step" + k).classList.remove("locked"); }
+  function markDone(k) {
+    stepDone.add(k);
+    const bars = $("progress").children;
+    for (let i = 0; i < bars.length; i++) bars[i].classList.toggle("done", stepDone.has(i + 1));
+  }
+  function relock(from) {
+    for (let k = from; k <= 8; k++) { $("step" + k).classList.add("locked"); stepDone.delete(k); }
+    const bars = $("progress").children;
+    for (let i = 0; i < bars.length; i++) bars[i].classList.toggle("done", stepDone.has(i + 1));
+    if (from <= 6) { $("btnRevealMu").disabled = false; $("out6").style.display = "none"; }
+  }
+  function scrollTo(k) { $("step" + k).scrollIntoView({ behavior: "smooth", block: "start" }); }
+  function setTexts() {
+    document.querySelectorAll(".nText").forEach(e => e.textContent = n);
+    document.querySelectorAll(".dfText").forEach(e => e.textContent = n - 1);
+    document.querySelectorAll(".lvlText").forEach(e => e.textContent = pct(level) + "%");
+    document.querySelectorAll(".lvlPct").forEach(e => e.textContent = pct(level));
+    document.querySelectorAll(".lvlDec").forEach(e => e.textContent = level.toFixed(2));
+    document.querySelectorAll(".muText").forEach(e => e.textContent = f2(POP_MU));
+    document.querySelectorAll(".sigText").forEach(e => e.textContent = f2(POP_SIGMA));
+  }
+  const parseNum = s => { const v = parseFloat(String(s).replace(/[,\s$]/g, "")); return isNaN(v) ? null : v; };
+  async function copyText(text, msgEl, okMsg) {
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {
+      const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+      ta.remove();
+    }
+    msgEl.textContent = ok ? okMsg : "Copy failed. Select the values on the page and copy them manually.";
+  }
+
+  // ---------- Step 1 ----------
+  $("btnStep1").onclick = () => { markDone(1); unlock(2); scrollTo(2); };
+
+  // ---------- Step 2 ----------
+  document.querySelectorAll("#nChoices button").forEach(b => b.onclick = () => {
+    n = +b.dataset.n;
+    document.querySelectorAll("#nChoices button").forEach(x => x.classList.toggle("active", x === b));
+    sample = null; myCI = null;
+    $("sampleOut").style.display = "none";
+    $("btnDraw").innerHTML = `Draw my random sample of <span class="nText">${n}</span> applicants`;
+    relock(3); setTexts();
+  });
+  $("btnDraw").onclick = () => {
+    sample = drawSample(n);
+    myCI = null;
+    $("sampleChips").innerHTML = sample.map(x => `<span class="chip">${x}</span>`).join("");
+    $("sampleOut").style.display = "block";
+    $("out2").style.display = "none";
+    $("fb2").className = "feedback";
+    $("inXbar").value = ""; $("inS").value = ""; $("copySampleMsg").textContent = "";
+    $("btnDraw").innerHTML = `Draw a different sample of <span class="nText">${n}</span>`;
+    relock(3); markDone(2); setTexts();
+  };
+  $("btnCopySample").onclick = () => copyText(sample.join("\n"), $("copySampleMsg"), `Copied. Paste into cell A1 in Excel; the scores fill A1:A${n}.`);
+  function showSampleStats() {
+    $("vXbar").textContent = f2(avg(sample));
+    $("vXbar2").textContent = f2(avg(sample));
+    $("vS").textContent = f2(stdevS(sample));
+    $("out2").style.display = "block";
+  }
+  $("btnCheck2").onclick = () => {
+    const a = parseNum($("inXbar").value), s = parseNum($("inS").value);
+    const tA = avg(sample), tS = stdevS(sample), tP = stdevP(sample);
+    const msgs = []; let good = true;
+    if (a == null) { msgs.push("Enter your =AVERAGE result."); good = false; }
+    else if (Math.abs(a - tA) <= 0.015) msgs.push(`✔ x̄ = ${f2(tA)} is correct.`);
+    else { msgs.push("✘ Your average is not quite right. Make sure the range covers all " + n + " scores."); good = false; }
+    if (s == null) { msgs.push("Enter your =STDEV.S result."); good = false; }
+    else if (Math.abs(s - tS) <= 0.015) msgs.push(`✔ s = ${f2(tS)} is correct.`);
+    else if (Math.abs(s - tP) <= 0.015) { msgs.push("✘ That matches STDEV.P. Use <b>STDEV.S</b>, which divides by n − 1."); good = false; }
+    else { msgs.push("✘ Your standard deviation is not quite right. Use =STDEV.S on your " + n + " scores."); good = false; }
+    $("fb2").className = "feedback show " + (good ? "good" : "warn");
+    $("fb2").innerHTML = msgs.join("<br>");
+    if (good) showSampleStats();
+  };
+  $("btnReveal2").onclick = showSampleStats;
+  $("btnStep2").onclick = () => { markDone(2); unlock(3); drawZ(); scrollTo(3); };
+
+  // ---------- Step 3 ----------
+  function drawZ() {
+    const c = $("zChart"); c.innerHTML = "";
+    const W = 720, H = 230, m = { l: 20, r: 20, t: 16, b: 34 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const z = zCrit(level), a2 = (1 - level) / 2;
+    const sx = x => m.l + (x + 3.6) / 7.2 * iw, sy = y => m.t + ih - y / 0.42 * ih;
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `Standard normal curve with ${pct(level)}% in the middle and ${a2} in each tail` }, c);
+    const area = (a, b) => { let d = `M${sx(a)},${sy(0)}`; for (let x = a; x <= b + 1e-9; x += 0.02) d += ` L${sx(x).toFixed(1)},${sy(normPdf(x, 0, 1)).toFixed(1)}`; return d + ` L${sx(b)},${sy(0)} Z`; };
+    el("path", { d: area(-z, z), fill: "var(--teal-soft)" }, svg);
+    el("path", { d: area(-3.6, -z), fill: "var(--curve)", opacity: 0.75 }, svg);
+    el("path", { d: area(z, 3.6), fill: "var(--curve)", opacity: 0.75 }, svg);
+    let d = ""; for (let x = -3.6; x <= 3.6; x += 0.02) d += (d ? " L" : "M") + sx(x).toFixed(1) + "," + sy(normPdf(x, 0, 1)).toFixed(1);
+    el("path", { d, fill: "none", stroke: "var(--text-2)", "stroke-width": 2 }, svg);
+    el("line", { x1: m.l, x2: W - m.r, y1: sy(0), y2: sy(0), stroke: "var(--muted)" }, svg);
+    [-z, z].forEach(v => el("line", { x1: sx(v), x2: sx(v), y1: sy(0), y2: sy(normPdf(v, 0, 1)), stroke: "var(--curve)", "stroke-width": 2 }, svg));
+    const ax = el("g", { class: "axis" }, svg);
+    el("text", { x: sx(-z), y: H - m.b + 18, "text-anchor": "middle", style: "font-weight:700" }, ax, `−z = −${f3(z)}`);
+    el("text", { x: sx(z), y: H - m.b + 18, "text-anchor": "middle", style: "font-weight:700" }, ax, `+z = +${f3(z)}`);
+    el("text", { x: sx(0), y: H - m.b + 18, "text-anchor": "middle" }, ax, "0");
+    el("text", { x: sx(0), y: sy(0.16), "text-anchor": "middle", class: "axis-title", style: "font-size:15px;font-weight:700" }, svg, `1 − α = ${level.toFixed(2)}`);
+    el("text", { x: sx(0), y: sy(0.16) + 18, "text-anchor": "middle", class: "axis-title" }, svg, "confidence level (middle area)");
+    el("text", { x: sx(-z - 0.75), y: sy(0.07), "text-anchor": "middle", class: "axis-title", style: "font-weight:700" }, svg, `α/2 = ${+a2.toFixed(3)}`);
+    el("text", { x: sx(z + 0.75), y: sy(0.07), "text-anchor": "middle", class: "axis-title", style: "font-weight:700" }, svg, `α/2 = ${+a2.toFixed(3)}`);
+    $("zTitle").textContent = `Standard normal curve at ${pct(level)}% confidence: z α/2 = ${f3(z)}`;
+    $("zTable").innerHTML = [0.90, 0.95, 0.99].map(l => {
+      const a = 1 - l, on = Math.abs(l - level) < 1e-9 ? ' style="background:var(--accent-soft);font-weight:700"' : "";
+      return `<tr${on}><td>${l.toFixed(2)} (${pct(l)}%)</td><td>${+a.toFixed(2)}</td><td>${+(a / 2).toFixed(3)}</td><td>${f3(zCrit(l))}</td><td class="l"><span class="formula">=NORM.S.INV(${+(1 - a / 2).toFixed(3)})</span></td></tr>`;
+    }).join("");
+    const zc = zCrit(level), se = POP_SIGMA / Math.sqrt(n);
+    $("pieceNote").innerHTML = `With your sample: point estimate <i>x̄</i> = <b>${f2(avg(sample))}</b>; critical value <i>z</i><sub>α/2</sub> = <b>${f3(zc)}</b> (${pct(level)}% confidence); ` +
+      `standard error <i>σ</i>/√<i>n</i> = ${f2(POP_SIGMA)}/√${n} = <b>${f2(se)}</b>. You will put these together in Excel in the next step.`;
+  }
+  document.querySelectorAll("#levelChoices button").forEach(b => b.onclick = () => {
+    level = +b.dataset.l;
+    document.querySelectorAll("#levelChoices button").forEach(x => x.classList.toggle("active", x === b));
+    $("simLevel").value = level.toFixed(2);
+    myCI = null; relock(4); markDone(2); setTexts(); drawZ();
+    // reset step 4 inputs
+    ["inT", "inSE", "inME", "inLo", "inHi"].forEach(id => $(id).value = "");
+    $("fb4").className = "feedback"; $("out4").style.display = "none";
+  });
+  $("btnStep3").onclick = () => {
+    markDone(3); unlock(4);
+    ["inT", "inSE", "inME", "inLo", "inHi"].forEach(id => $(id).value = "");
+    $("fb4").className = "feedback"; $("out4").style.display = "none";
+    $("inT").placeholder = "e.g., 1.960";
+    scrollTo(4);
+  };
+
+  // ---------- Step 4 ----------
+  function computeMine() { myCI = makeCI(sample, level, "z"); return myCI; }
+  function showCI() {
+    const c = computeMine();
+    $("ciTable").innerHTML = [
+      ["Sample mean <i>x̄</i>", f2(c.xbar)],
+      ["Known population std. dev. <i>σ</i>", f2(POP_SIGMA)],
+      ["Sample size <i>n</i>", `${n}`],
+      ["Confidence level 1 − α, and α", `${level.toFixed(2)} and ${+(1 - level).toFixed(2)}`],
+      ["Critical value <i>z</i><sub>α/2</sub>", f3(c.crit)],
+      ["Standard error <i>σ</i>/√<i>n</i>", f2(c.se)],
+      ["Margin of error <i>z</i> × SE", f2(c.me)],
+      [`<b>${pct(level)}% CI</b>`, `<b>[${f2(c.lo)}, ${f2(c.hi)}]</b>`]
+    ].map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+    drawMyCI();
+    $("out4").style.display = "block";
+  }
+  function drawMyCI(target, showMu) {
+    const c = target || $("myCIChart"); c.innerHTML = "";
+    const W = 720, H = 110, m = { l: 20, r: 20, t: 34, b: 34 };
+    const iw = W - m.l - m.r;
+    const half = Math.max(80, Math.abs(myCI.lo - myCI.xbar) * 1.6, showMu ? Math.abs(POP_MU - myCI.xbar) * 1.3 : 0);
+    const lo = Math.floor((myCI.xbar - half) / 20) * 20, hi = Math.ceil((myCI.xbar + half) / 20) * 20;
+    const sx = x => m.l + (x - lo) / (hi - lo) * iw, y = m.t + 18;
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `Confidence interval from ${f2(myCI.lo)} to ${f2(myCI.hi)}` }, c);
+    const ax = el("g", { class: "axis" }, svg);
+    el("line", { x1: m.l, x2: W - m.r, y1: H - m.b, y2: H - m.b, stroke: "var(--muted)" }, ax);
+    for (let v = lo; v <= hi; v += 20) { el("line", { x1: sx(v), x2: sx(v), y1: H - m.b, y2: H - m.b + 4, stroke: "var(--muted)" }, ax); el("text", { x: sx(v), y: H - m.b + 17, "text-anchor": "middle" }, ax, v); }
+    el("line", { x1: sx(myCI.lo), x2: sx(myCI.hi), y1: y, y2: y, stroke: "var(--accent)", "stroke-width": 5, "stroke-linecap": "round" }, svg);
+    [myCI.lo, myCI.hi].forEach(v => el("line", { x1: sx(v), x2: sx(v), y1: y - 9, y2: y + 9, stroke: "var(--accent)", "stroke-width": 2.5 }, svg));
+    el("circle", { cx: sx(myCI.xbar), cy: y, r: 6, fill: "var(--surface)", stroke: "var(--accent)", "stroke-width": 3 }, svg);
+    el("text", { x: sx(myCI.lo), y: y - 14, "text-anchor": "middle", class: "axis-title" }, svg, f2(myCI.lo));
+    el("text", { x: sx(myCI.hi), y: y - 14, "text-anchor": "middle", class: "axis-title" }, svg, f2(myCI.hi));
+    el("text", { x: sx(myCI.xbar), y: y - 14, "text-anchor": "middle", class: "axis-title", style: "font-weight:700" }, svg, "x̄ = " + f2(myCI.xbar));
+    if (showMu) {
+      el("line", { x1: sx(POP_MU), x2: sx(POP_MU), y1: 4, y2: H - m.b, stroke: "var(--text)", "stroke-width": 1.5, "stroke-dasharray": "4 4" }, svg);
+      el("text", { x: sx(POP_MU) + 5, y: 12, class: "axis-title", style: "font-weight:700" }, svg, "μ = " + f2(POP_MU));
+    }
+  }
+  $("btnCheck4").onclick = () => {
+    const c = computeMine();
+    const items = [
+      ["inT", "Critical value z", c.crit, 0.006, 3],
+      ["inSE", "Standard error", c.se, 0.02, 2],
+      ["inME", "Margin of error", c.me, 0.06, 2],
+      ["inLo", "Lower bound", c.lo, 0.06, 2],
+      ["inHi", "Upper bound", c.hi, 0.06, 2]
+    ];
+    const msgs = []; let good = true;
+    items.forEach(([id, name, val, tol, dp]) => {
+      const v = parseNum($(id).value);
+      if (v == null) { msgs.push(`Enter your ${name.toLowerCase()}.`); good = false; }
+      else if (Math.abs(v - val) <= tol) msgs.push(`✔ ${name} = ${val.toFixed(dp)} is correct.`);
+      else {
+        good = false;
+        let tip = "";
+        if (id === "inT" && Math.abs(v - tCrit(level, n - 1)) < 0.006) tip = " That is a t value. σ is known here, so use =NORM.S.INV(1 − α/2).";
+        else if (id === "inT" && Math.abs(v - zCrit(1 - 2 * (1 - level))) < 0.006) tip = " That is a one-tail value. Split α into two tails: =NORM.S.INV(1 − α/2).";
+        else if (id === "inT" && Math.abs(v - normInv(1 - (1 - level))) < 0.006) tip = " Use 1 − α/2 inside NORM.S.INV, not 1 − α.";
+        else if (id === "inSE" && Math.abs(v - POP_SIGMA / n) < 0.05) tip = " Divide σ by the square root of n: =σ/SQRT(n).";
+        else if (id === "inSE" && Math.abs(v - c.s / Math.sqrt(n)) < 0.05) tip = ` σ is known, so use σ = ${f2(POP_SIGMA)}, not your sample's s.`;
+        msgs.push(`✘ ${name} is not quite right.${tip}`);
+      }
+    });
+    $("fb4").className = "feedback show " + (good ? "good" : "warn");
+    $("fb4").innerHTML = msgs.join("<br>") + (good ? "<br>Great work. Your interval is shown below." : "");
+    if (good) showCI();
+  };
+  $("btnReveal4").onclick = showCI;
+  $("btnStep4").onclick = () => { markDone(4); unlock(5); fillFrame(); scrollTo(5); };
+
+  // ---------- Step 5 ----------
+  function fillFrame() {
+    const c = myCI, L = pct(level);
+    $("frameText").innerHTML = `"We are <b>${L}%</b> confident that the true mean GMAT score of the applicant pool, <i>μ</i>, is between <b>${f2(c.lo)}</b> and <b>${f2(c.hi)}</b>. ` +
+      `If we drew many samples this way and built one interval from each, about <b>${L}%</b> of those intervals would contain <i>μ</i>."`;
+    $("optA").innerHTML = `There is a ${L}% probability that <i>μ</i> lies in [${f2(c.lo)}, ${f2(c.hi)}].`;
+    $("optB").innerHTML = `If we repeated this sampling many times and built one interval from each sample, about ${L}% of those intervals would contain <i>μ</i>.`;
+    $("optC").innerHTML = `${L}% of applicants have GMAT scores between ${f2(c.lo)} and ${f2(c.hi)}.`;
+    $("optD").innerHTML = `The true mean GMAT score is exactly ${f2(c.xbar)}.`;
+    document.querySelectorAll('input[name="interp"]').forEach(r => r.checked = false);
+    $("fb5").className = "feedback"; $("row5").style.display = "none";
+  }
+  $("btnCheck5").onclick = () => {
+    const p = document.querySelector('input[name="interp"]:checked'), fb = $("fb5"), L = pct(level);
+    if (!p) { fb.className = "feedback info show"; fb.innerHTML = "Pick one statement first."; return; }
+    const why = {
+      a: `<b>Not quite.</b> This is the most common mistake. Once your sample is drawn, your interval is fixed and <i>μ</i> is fixed, so the probability is 0 or 1. We just do not know which. The ${L}% describes the <b>procedure</b>, not this one interval.`,
+      c: `<b>Not quite.</b> A confidence interval is about the population <b>mean</b>, not about individual applicants. Individual scores spread much more widely (you will see this in Step 6).`,
+      d: `<b>Not quite.</b> <i>x̄</i> = ${f2(myCI.xbar)} is our point estimate, the center of the interval. The true <i>μ</i> is unknown and almost certainly differs from <i>x̄</i>.`
+    };
+    if (p.value === "b") {
+      fb.className = "feedback good show";
+      fb.innerHTML = `<b>Correct.</b> The ${L}% is the long-run success rate of the method. You will see this happen in Step 7.`;
+      $("row5").style.display = "flex";
+    } else { fb.className = "feedback warn show"; fb.innerHTML = why[p.value]; }
+  };
+  $("btnStep5").onclick = () => { markDone(5); unlock(6); scrollTo(6); };
+
+  // ---------- Step 6 ----------
+  function popHistogram(container) {
+    const W = 720, H = 300, m = { l: 46, r: 14, t: 12, b: 40 }, band = 46;
+    const iw = W - m.l - m.r, ih = H - m.t - m.b - band;
+    const bw = 20, nb = (XMAX - XMIN) / bw, counts = new Array(nb).fill(0);
+    POP.forEach(x => { let b = Math.floor((x - XMIN) / bw); b = Math.max(0, Math.min(nb - 1, b)); counts[b]++; });
+    const yMax = niceMax(Math.max(...counts) * 1.05);
+    const sx = x => m.l + (x - XMIN) / (XMAX - XMIN) * iw, sy = y => m.t + ih - y / yMax * ih;
+    container.innerHTML = "";
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Histogram of all 2,637 GMAT scores with the true mean and your confidence interval" }, container);
+    const ax = el("g", { class: "axis" }, svg);
+    const st = niceStep(yMax);
+    for (let v = 0; v <= yMax + 1e-9; v += st) { el("line", { x1: m.l, x2: W - m.r, y1: sy(v), y2: sy(v), stroke: "var(--grid)" }, ax); el("text", { x: m.l - 8, y: sy(v) + 4, "text-anchor": "end" }, ax, v); }
+    for (let v = XMIN; v <= XMAX; v += 100) el("text", { x: sx(v), y: H - m.b + 16, "text-anchor": "middle" }, ax, v);
+    el("text", { x: m.l + iw / 2, y: H - 4, "text-anchor": "middle", class: "axis-title" }, ax, "GMAT score");
+    el("text", { x: 12, y: m.t + ih / 2, "text-anchor": "middle", class: "axis-title", transform: `rotate(-90 12 ${m.t + ih / 2})` }, ax, "Count");
+    const pxb = iw / nb;
+    counts.forEach((c, i) => { if (!c) return; const a = XMIN + i * bw; const p = el("path", { d: barPath(sx(a) + 1, sy(c), pxb - 2, sy(0) - sy(c), 4), fill: "var(--pop)" }, svg); el("title", {}, p, `${a} to ${a + bw}: ${c} applicants`); });
+    el("line", { x1: m.l, x2: W - m.r, y1: sy(0), y2: sy(0), stroke: "var(--muted)" }, ax);
+    const yb = sy(0) + band / 2 + 4;
+    el("line", { x1: sx(myCI.lo), x2: sx(myCI.hi), y1: yb, y2: yb, stroke: "var(--accent)", "stroke-width": 6, "stroke-linecap": "round" }, svg);
+    el("circle", { cx: sx(myCI.xbar), cy: yb, r: 5, fill: "var(--surface)", stroke: "var(--accent)", "stroke-width": 2.5 }, svg);
+    el("text", { x: sx(myCI.hi) + 10, y: yb + 4, class: "axis-title" }, svg, `your CI [${f2(myCI.lo)}, ${f2(myCI.hi)}]`);
+    el("line", { x1: sx(POP_MU), x2: sx(POP_MU), y1: m.t, y2: yb + 12, stroke: "var(--text)", "stroke-width": 1.5, "stroke-dasharray": "4 4" }, svg);
+    el("text", { x: sx(POP_MU) + 5, y: m.t + 10, class: "axis-title", style: "font-weight:700" }, svg, "μ = " + f2(POP_MU));
+  }
+  $("btnRevealMu").onclick = () => {
+    $("muVal").textContent = f2(POP_MU);
+    $("sigmaVal").textContent = f2(POP_SIGMA);
+    $("out6").style.display = "block";
+    popHistogram($("popChart"));
+    const fb = $("fb6");
+    if (myCI.hit) {
+      fb.className = "feedback good show";
+      fb.innerHTML = `<b>Your interval caught μ.</b> [${f2(myCI.lo)}, ${f2(myCI.hi)}] contains <i>μ</i> = ${f2(POP_MU)}. Your point estimate <i>x̄</i> = ${f2(myCI.xbar)} missed <i>μ</i> by ${f2(Math.abs(myCI.xbar - POP_MU))}, but the margin of error (${f2(myCI.me)}) was large enough to cover it.`;
+    } else {
+      fb.className = "feedback warn show";
+      fb.innerHTML = `<b>Your interval missed μ.</b> [${f2(myCI.lo)}, ${f2(myCI.hi)}] does not contain <i>μ</i> = ${f2(POP_MU)}. You did nothing wrong! You drew one of the unlucky samples. About ${100 - pct(level)}% of samples lead to an interval that misses. Step 7 shows how often this happens.`;
+    }
+    $("btnRevealMu").disabled = true;
+  };
+  $("btnStep6").onclick = () => {
+    markDone(6); unlock(7);
+    $("simN").value = String(n); $("simLevel").value = level.toFixed(2);
+    simReset();
+    scrollTo(7);
+  };
+
+  // ---------- Step 7: simulation ----------
+  let sims = [], timer = null;
+  const SHOW = 100;
+  function simSettings() { return { L: +$("simLevel").value, N: +$("simN").value, M: "z" }; }
+  function simReset() {
+    stopAnim(); sims = [];
+    $("fb7").className = "feedback"; $("fb7b").className = "feedback"; $("copySimMsg").textContent = ""; $("inHits").value = "";
+    updateSim();
+  }
+  function addOne() {
+    const { L, N, M } = simSettings();
+    const ci = makeCI(drawSample(N), L, M);
+    ci.level = L; ci.method = M; ci.id = sims.length + 1;
+    sims.push(ci);
+  }
+  function stopAnim() { if (timer) { clearInterval(timer); timer = null; } $("btnPause").disabled = true; $("btnSim1").disabled = false; $("btnSim100").disabled = false; }
+  $("btnSim1").onclick = () => { addOne(); updateSim(); };
+  $("btnSim100").onclick = () => {
+    if (timer) return;
+    let left = 100;
+    $("btnPause").disabled = false; $("btnSim1").disabled = true; $("btnSim100").disabled = true;
+    $("btnPause").textContent = "Pause";
+    const tick = () => { addOne(); left--; updateSim(); if (left <= 0) { stopAnim(); simFeedback(); } };
+    timer = setInterval(tick, 45);
+    $("btnPause").onclick = () => {
+      if (timer) { clearInterval(timer); timer = null; $("btnPause").textContent = "Resume"; }
+      else { timer = setInterval(tick, 45); $("btnPause").textContent = "Pause"; }
+    };
+  };
+  $("btnSimReset").onclick = simReset;
+  ["simLevel", "simN"].forEach(id => $(id).onchange = () => {
+    stopAnim();
+    const { L } = simSettings();
+    document.querySelectorAll("#step7 .lvlText").forEach(e => e.textContent = pct(L) + "%");
+    document.querySelectorAll("#step7 .lvlPct").forEach(e => e.textContent = pct(L));
+    $("fb7").className = "feedback info show";
+    $("fb7").innerHTML = "Settings changed. New intervals use the new settings. Click <b>Reset</b> to start a fresh count, or keep drawing to compare.";
+    updateSim();
+  });
+
+  function updateSim() {
+    const total = sims.length, hits = sims.filter(s => s.hit).length;
+    const { L } = simSettings();
+    $("cTotal").textContent = total; $("cHit").textContent = hits; $("cMiss").textContent = total - hits;
+    $("cPct").textContent = total ? (100 * hits / total).toFixed(1) + "%" : "–";
+    const lvls = [...new Set(sims.map(s => s.level))];
+    $("cTarget").textContent = lvls.length > 1 ? "mixed confidence levels" : "target: " + pct(lvls[0] || L) + "%";
+    drawSimChart(); drawRunChart();
+    const ok = total >= 100;
+    $("btnStep7").disabled = !ok; $("step7Hint").style.display = ok ? "none" : "";
+  }
+  function simFeedback() {
+    const total = sims.length, hits = sims.filter(s => s.hit).length;
+    const p = document.querySelector('input[name="pred7"]:checked');
+    const L = pct(simSettings().L), fb = $("fb7");
+    let lead = "";
+    if (p) lead = p.value === "most" ? "<b>Your prediction was right.</b> " : "<b>Compare with your prediction.</b> ";
+    fb.className = "feedback " + (p && p.value === "most" ? "good" : "info") + " show";
+    const rate = 100 * hits / total, gap = Math.abs(rate - L);
+    const near = gap <= 3 ? `, close to the ${L}% confidence level` : `. That is a bit ${rate < L ? "below" : "above"} ${L}%, which is normal with only ${total} intervals: the count bounces around from run to run`;
+    fb.innerHTML = lead + `${hits} of ${total} intervals (${rate.toFixed(1)}%) contain <i>μ</i>${near}. ` +
+      `The <b>red</b> intervals are the unlucky samples. Every analyst used the same correct method, and none of them could tell from their own data whether they were one of the unlucky ones. ` +
+      `Keep drawing: the running percentage settles near ${L}%.`;
+  }
+  function drawSimChart() {
+    const c = $("simChart"); c.innerHTML = "";
+    const shown = sims.slice(-SHOW).reverse();
+    const W = 720, rowH = 4.2, m = { l: 46, r: 14, t: 14, b: 34 };
+    const H = m.t + m.b + SHOW * rowH;
+    const iw = W - m.l - m.r;
+    let half = 120;
+    shown.forEach(s => { half = Math.max(half, Math.abs(s.lo - POP_MU), Math.abs(s.hi - POP_MU)); });
+    half = Math.ceil(half * 1.05 / 20) * 20;
+    const lo = POP_MU - half, hi = POP_MU + half;
+    const sx = x => m.l + (x - lo) / (hi - lo) * iw;
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${shown.length} most recent confidence intervals compared with the true mean` }, c);
+    const ax = el("g", { class: "axis" }, svg);
+    const step = half > 200 ? 50 : 25;
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      el("line", { x1: sx(v), x2: sx(v), y1: m.t, y2: H - m.b, stroke: "var(--grid)" }, ax);
+      el("text", { x: sx(v), y: H - m.b + 16, "text-anchor": "middle" }, ax, v);
+    }
+    el("text", { x: m.l + iw / 2, y: H - 4, "text-anchor": "middle", class: "axis-title" }, ax, "GMAT score");
+    if (!shown.length) el("text", { x: m.l + iw / 2, y: m.t + 60, "text-anchor": "middle", class: "axis-title" }, svg, "Click Draw 1 sample or Draw 100 samples to start.");
+    shown.forEach((s, i) => {
+      const y = m.t + i * rowH + rowH / 2, col = s.hit ? "var(--good)" : "var(--bad)";
+      const g = el("g", {}, svg);
+      el("line", { x1: sx(s.lo), x2: sx(s.hi), y1: y, y2: y, stroke: col, "stroke-width": s.hit ? 2 : 2.6 }, g);
+      el("circle", { cx: sx(s.xbar), cy: y, r: 1.6, fill: "var(--text-2)" }, g);
+      el("rect", { x: sx(s.lo) - 2, y: y - rowH / 2, width: Math.max(4, sx(s.hi) - sx(s.lo) + 4), height: rowH, fill: "transparent" }, g);
+      el("title", {}, g, `Sample ${s.id}: x̄ = ${f2(s.xbar)}, ${pct(s.level)}% CI [${f2(s.lo)}, ${f2(s.hi)}], ${s.hit ? "contains μ" : "misses μ"}`);
+    });
+    el("line", { x1: sx(POP_MU), x2: sx(POP_MU), y1: m.t - 6, y2: H - m.b, stroke: "var(--text)", "stroke-width": 1.5, "stroke-dasharray": "5 4" }, svg);
+    el("text", { x: sx(POP_MU) + 5, y: m.t - 2, class: "axis-title", style: "font-weight:700" }, svg, "μ = " + f2(POP_MU));
+    $("simAxisNote").textContent = sims.length > SHOW ? `Showing the ${SHOW} most recent of ${sims.length} intervals. The counts above include all of them.` : "";
+  }
+  function drawRunChart() {
+    const c = $("runChart"); c.innerHTML = "";
+    const W = 720, H = 190, m = { l: 46, r: 14, t: 12, b: 36 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const total = sims.length, nMax = Math.max(100, Math.ceil(total / 100) * 100);
+    const yLo = 0, yHi = 100;
+    const sx = v => m.l + v / nMax * iw, sy = v => m.t + ih - (Math.max(yLo, v) - yLo) / (yHi - yLo) * ih;
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Running percentage of intervals that contain the true mean" }, c);
+    const ax = el("g", { class: "axis" }, svg);
+    for (let v = yLo; v <= yHi; v += 20) { el("line", { x1: m.l, x2: W - m.r, y1: sy(v), y2: sy(v), stroke: "var(--grid)" }, ax); el("text", { x: m.l - 8, y: sy(v) + 4, "text-anchor": "end" }, ax, v + "%"); }
+    const xs = nMax <= 200 ? 20 : nMax <= 500 ? 50 : 100;
+    for (let v = 0; v <= nMax; v += xs) el("text", { x: sx(v), y: H - m.b + 16, "text-anchor": "middle" }, ax, v);
+    el("text", { x: m.l + iw / 2, y: H - 4, "text-anchor": "middle", class: "axis-title" }, ax, "Number of intervals built");
+    const lvls = [...new Set(sims.map(s => s.level))];
+    const tgt = 100 * (lvls.length === 1 ? lvls[0] : simSettings().L);
+    el("line", { x1: m.l, x2: W - m.r, y1: sy(tgt), y2: sy(tgt), stroke: "var(--curve)", "stroke-width": 1.5, "stroke-dasharray": "6 4" }, svg);
+    el("text", { x: W - m.r - 4, y: sy(tgt) - 6, "text-anchor": "end", class: "axis-title", style: "fill:var(--curve);font-weight:700" }, svg, `confidence level ${pct(tgt / 100)}%`);
+    if (total) {
+      let hits = 0, d = "";
+      sims.forEach((s, i) => { if (s.hit) hits++; d += (d ? " L" : "M") + sx(i + 1).toFixed(1) + "," + sy(100 * hits / (i + 1)).toFixed(1); });
+      el("path", { d, fill: "none", stroke: "var(--accent)", "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+      el("circle", { cx: sx(total), cy: sy(100 * hits / total), r: 4, fill: "var(--accent)" }, svg);
+    }
+  }
+  $("btnCopySim").onclick = () => {
+    if (!sims.length) { $("copySimMsg").textContent = "Build some intervals first."; return; }
+    const rows = ["Sample\tx̄\tLower\tUpper"].concat(sims.map(s => `${s.id}\t${f2(s.xbar)}\t${f2(s.lo)}\t${f2(s.hi)}`));
+    copyText(rows.join("\n"), $("copySimMsg"), `Copied ${sims.length} intervals. Paste into cell A1 of a new sheet.`);
+    $("btnCopySim").dataset.copied = sims.length;
+  };
+  $("btnCheck7").onclick = () => {
+    const v = parseNum($("inHits").value), fb = $("fb7b");
+    const copiedN = +($("btnCopySim").dataset.copied || sims.length);
+    const sub = sims.slice(0, copiedN);
+    // compare using the rounded bounds that were copied
+    const hitsRounded = sub.filter(s => +f2(s.lo) <= +f2(POP_MU) && +f2(s.hi) >= +f2(POP_MU)).length;
+    if (v == null) { fb.className = "feedback info show"; fb.innerHTML = "Enter the count from your COUNTIF formula."; return; }
+    if (v === hitsRounded) {
+      fb.className = "feedback good show";
+      fb.innerHTML = `<b>Correct.</b> ${hitsRounded} of the ${copiedN} intervals you copied contain μ = ${f2(POP_MU)}, which is ${(100 * hitsRounded / copiedN).toFixed(1)}%.`;
+    } else {
+      fb.className = "feedback warn show";
+      fb.innerHTML = `Not quite. Check that your formula is <span class="formula">=AND(C2&lt;=${f2(POP_MU)}, D2&gt;=${f2(POP_MU)})</span>, that you filled it down for all ${copiedN} rows, and that you pasted the most recent copy.`;
+    }
+  };
+  $("btnStep7").onclick = () => { markDone(7); markDone(8); unlock(8); scrollTo(8); };
+
+  // ---------- Step 8 ----------
+  document.querySelectorAll(".qa button").forEach(b => b.onclick = () => {
+    const qa = b.closest(".qa"); qa.classList.toggle("open");
+    b.textContent = qa.classList.contains("open") ? "Hide" : "Check";
+  });
+
+  setTexts();
+  updateSim();
+})();
+</script>
+</body>
+</html>
